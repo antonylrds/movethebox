@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Making your first Phaser 3 Game - Part 10</title>
+    <script src="//cdn.jsdelivr.net/npm/phaser@3.11.0/dist/phaser.js"></script>
+    <style type="text/css">
+      body {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="text/javascript">
+      var config = {
+        type: Phaser.AUTO,
+        width: 512,
+        height: 512,
+        physics: {
+          default: "arcade",
+          arcade: {
+            gravity: { y: 200 },
+            debug: false
+          }
+        },
+        scene: {
+          preload: preload,
+          create: create,
+          update: update
+        }
+      };
+
+      const boxSize = 64;
+      var sky;
+      var boxes;
+      var metalboxes;
+      var woodenboxes1;
+      var woodenboxes2;
+      var woodenboxes3;
+      var platforms;
+      var cursors;
+      var gameOver = false;
+      var movementText;
+      var howToPlay;
+      var selectedBox;
+      var selectedBox2;
+      var score = 0;
+
+      var game = new Phaser.Game(config);
+
+      function preload() {
+        this.load.image("sky", "assets/skynew.png");
+        this.load.image("ground", "assets/platform.png");
+        this.load.image("metalbox", "assets/metalbox.png");
+        this.load.image("woodenbox1", "assets/woodenbox1.png");
+        this.load.image("woodenbox2", "assets/woodenbox2.png");
+        this.load.image("woodenbox3", "assets/woodenbox3.png");
+      }
+
+      function create() {
+        //  A simple background for our game
+        //let game = this.physics;
+        game = this;
+        //this.add.image(256, 256, "sky");
+        sky = this.add.sprite(256, 256, "sky").setInteractive();
+        sky.on("pointerdown", handleClick);
+
+        //  The platforms group contains the ground and the 2 ledges we can jump on
+        platforms = this.physics.add.staticGroup();
+
+        //  Here we create the ground.
+        //  Scale it to fit the width of the game (the original sprite is 400x32 in size)
+        platforms
+          .create(256, 512, "ground")
+          .setScale(2)
+          .refreshBody();
+
+        boxes = this.physics.add.group();
+        metalboxes = this.physics.add.group();
+        woodenboxes1 = this.physics.add.group();
+        woodenboxes2 = this.physics.add.group();
+        metalBox1 = createBox(224, 300, "metalbox", game);
+        metalBox2 = createBox(32, 200, "metalbox", game);
+        woodenBox1 = createBox(224, 200, "woodenbox1", game);
+        woodenBox2 = createBox(96, 200, "woodenbox1", game);
+        woodenBox4 = createBox(160, 300, "woodenbox2", game);
+        woodenBox5 = createBox(288, 200, "woodenbox2", game);
+
+        //  The score
+        movementText = game.add.text(16, 16, "Score: " + score, {
+          fontSize: "32px",
+          fill: "#000"
+        });
+
+        howToPlay = game.add.text(
+          16,
+          48,
+          "Clique em duas caixa para inverter suas posições. \nInverta caixar iguais e ganhe pontos. \nClique em uma caixa depois em uma direção para mover\na caixa.",
+          {
+            fontSize: "14px",
+            fill: "#000"
+          }
+        );
+
+        //  Collide the player and the stars with the platforms
+        this.physics.add.collider(metalboxes, platforms);
+      }
+
+      function update() {}
+      function createBox(x, y, type) {
+        let box = metalboxes.create(x, y, type).setCollideWorldBounds(true);
+        box.setInteractive().on("pointerdown", selectBox);
+        boxes.add(box);
+        game.physics.add.collider(box, metalboxes, handleCollision, null, this);
+        game.physics.add.collider(box, boxes, handleCollision, null, this);
+        return box;
+      }
+
+      function selectBox() {
+        if (selectedBox) {
+          selectedBox2 = this;
+          swap();
+          selectedBox.clearTint();
+          selectedBox = null;
+          selectedBox2 = null;
+          return;
+        }
+        selectedBox = this;
+        selectedBox.setTint(0xff0000);
+        console.log(selectedBox);
+      }
+
+      function swap() {
+        game.tweens.add({
+          targets: selectedBox,
+          x: selectedBox2.x,
+          y: selectedBox2.y,
+          duration: 300,
+          ease: "Sine.easeInOut",
+          repeat: 0,
+          yoyo: false,
+          onStart: disableKeys,
+          onComplete: enableKeys,
+          completeDelay: 500
+        });
+        game.tweens.add({
+          targets: selectedBox2,
+          x: selectedBox.x,
+          y: selectedBox.y,
+          duration: 300,
+          ease: "Sine.easeInOut",
+          repeat: 0,
+          yoyo: false,
+          onStart: disableKeys,
+          onComplete: enableKeys,
+          completeDelay: 500
+        });
+      }
+
+      function move(x, y) {
+        var moveX = 0;
+        var moveY = 0;
+        var preventMovement = false;
+        if (x > selectedBox.x + boxSize - 1) {
+          moveX = 64;
+        } else {
+          moveX = -64;
+        }
+        if (selectedBox.x + moveX < 32 || selectedBox.x + moveX > 500) {
+          return;
+        }
+        boxes.children.iterate(function(child) {
+          if (
+            selectedBox.x + moveX == child.x &&
+            selectedBox.y + moveY == child.y
+          ) {
+            preventMovement = true;
+          }
+        });
+        if (preventMovement) return;
+
+        game.tweens.add({
+          targets: selectedBox,
+          x: selectedBox.x + moveX,
+          y: selectedBox.y + moveY,
+          duration: 300,
+          ease: "Sine.easeInOut",
+          repeat: 0,
+          yoyo: false,
+          onStart: disableKeys,
+          onComplete: enableKeys,
+          completeDelay: 500
+        });
+      }
+
+      function handleClick() {
+        let mouse = game.input.mousePointer;
+        console.log(mouse.x, mouse.y);
+        if (selectedBox) {
+          move(mouse.x, mouse.y);
+          selectedBox.clearTint();
+          selectedBox = null;
+        }
+      }
+
+      function enableKeys() {
+        enableGravity();
+        for (prop in cursors) {
+          cursors[prop].reset();
+        }
+        console.log("Keys enabled");
+      }
+
+      function disableKeys() {
+        disableGravity();
+        for (prop in cursors) {
+          cursors[prop].reset();
+          cursors[prop].enabled = false;
+          // console.log(cursors[prop]);
+        }
+        console.log("Keys disabled");
+      }
+
+      function disableGravity() {
+        boxes.children.iterate(child => child.body.setAllowGravity(false));
+      }
+
+      function enableGravity() {
+        boxes.children.iterate(child => child.body.setAllowGravity(true));
+      }
+
+      function handleCollision(box1, box2) {
+        if (box1.texture.key == box2.texture.key) {
+          score += 10;
+          // box1.disableBody(false, true);
+          // box2.disableBody(false, true);
+          box1.destroy();
+          box2.destroy();
+        }
+        movementText.setText("Score: " + score);
+      }
+    </script>
+  </body>
+</html>
